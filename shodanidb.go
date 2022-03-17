@@ -132,9 +132,11 @@ func loadTargets(inputs []string, verbose bool) []string {
 
 
 func getData(ip string, verbose bool) Response {
-	res, err := http.Get(
-		fmt.Sprintf("https://internetdb.shodan.io/%s", ip),
-	)
+	url := fmt.Sprintf("https://internetdb.shodan.io/%s", ip)
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", url, nil)
+	req.Header.Add("User-Agent", `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36`)
+	res, err := client.Do(req)
 	if err != nil {
 		if verbose {
 			log.Printf("Couldn't connect to the server! (%s)", ip)
