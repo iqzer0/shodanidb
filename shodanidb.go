@@ -3,15 +3,16 @@ package main
 import (
 	"bufio"
 	"encoding/json"
+	"github.com/apoorvam/goterminal"
 	"flag"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"time"
 	"os"
 	"strings"
 	"sync"
-
 	"github.com/logrusorgru/aurora"
 	"github.com/projectdiscovery/iputil"
 	"github.com/projectdiscovery/mapcidr"
@@ -27,7 +28,6 @@ type Response struct {
 }
 
 func main() {
-
 	var noCPEs bool
 	flag.BoolVar(&noCPEs, "nc", false, "Hide CPEs")
 
@@ -67,23 +67,25 @@ func main() {
 	}
 
 	targets = loadTargets(inputs, verbose)
-
 	channel := make(chan Response)
 	var wg sync.WaitGroup
-
+	total := len(targets)
+	writer := goterminal.New(os.Stdout)
 	for i := 0; i < len(targets); i++ {
+		fmt.Fprintf(writer, "Scanning (%d/%d) hosts...\n", i,total)
+		writer.Print()
+		time.Sleep(time.Millisecond * 5)
+		writer.Clear()
 		wg.Add(1)
-
 		i := i
-
 		go func() {
 			defer wg.Done()
 			jsonData := getData(targets[i], verbose)
 			channel <- jsonData
 		}()
-
+	
 	}
-
+	
 	go func() {
 		wg.Wait()
 		close(channel)
@@ -93,10 +95,15 @@ func main() {
 		saveJson(channel, jsonFile)
 		return
 	}
-
+	
 	for i := 0; i < len(targets); i++ {
 		printResult(<-channel, noCPEs, noHostnames, noTags, noVulns, noColor)
+		fmt.Fprintf(writer, "Scanning (%d/%d) hosts...\n", i,total)
+		writer.Print()
+		time.Sleep(time.Millisecond * 5)
+		writer.Clear()
 	}
+	writer.Reset()
 }
 
 
@@ -120,17 +127,14 @@ func loadTargets(inputs []string, verbose bool) []string {
 			targets = append(targets, target)
 		}
 	}
-
 	return targets
 }
 
 
 func getData(ip string, verbose bool) Response {
-
 	res, err := http.Get(
 		fmt.Sprintf("https://internetdb.shodan.io/%s", ip),
 	)
-
 	if err != nil {
 		if verbose {
 			log.Printf("Couldn't connect to the server! (%s)", ip)
@@ -138,7 +142,6 @@ func getData(ip string, verbose bool) Response {
 		}		
 		return Response{}
 	}
-
 	raw, err := ioutil.ReadAll(res.Body)
 	if err != nil {
 		if verbose {
@@ -147,12 +150,9 @@ func getData(ip string, verbose bool) Response {
 		}
 		return Response{}
 	}
-
 	res.Body.Close()
-
 	var jsonData Response
 	err = json.Unmarshal(raw, &jsonData)
-
 	if err != nil {
 		if verbose {
 			log.Printf("The data from %s is incorrect!", ip)
@@ -160,20 +160,17 @@ func getData(ip string, verbose bool) Response {
 		}
 		return Response{}
 	}
-
 	return jsonData
 }
 
 
 func saveJson(chData chan Response, jsonFile string) {
-
 	var jsonDatas []Response
 	for jsonData := range chData {
 		if jsonData.IP != "" {
 			jsonDatas = append(jsonDatas, jsonData)
 		}
 	}
-
 	if len(jsonDatas) != 0 {
 		stringData, _ := json.Marshal(jsonDatas)
 		_ = ioutil.WriteFile(jsonFile, stringData, 0644)
@@ -182,56 +179,54 @@ func saveJson(chData chan Response, jsonFile string) {
 
 
 func printResult(jsonData Response, noCPEs bool, noHostnames bool, noTags bool, noVulns bool, noColor bool) {
-
 	builder := &strings.Builder{}
-
 	if jsonData.IP == "" {
 		return
 	}
 
-	fmt.Println(jsonData.IP)
+	builder.WriteString(jsonData.IP + "\t")
 
 	ports := strings.Trim(strings.Join(strings.Fields(fmt.Sprint(jsonData.Ports)), ", "), "[]")
 
 	if !noColor {
-		builder.WriteString("Ports: " + aurora.Green(ports).String() + "\n")
+		builder.WriteString(aurora.Green(ports).String())
 	} else {
-		builder.WriteString("Ports: " + ports + "\n")
+		builder.WriteString(ports)
 	}
 
 	if (!noCPEs && len(jsonData.CPES) > 0) {
 		cpes := strings.Join(jsonData.CPES, ", ")
 		if !noColor {
-			builder.WriteString("CPEs: " + aurora.Yellow(cpes).String() + "\n")
+			builder.WriteString("\tCPEs: " + aurora.Yellow(cpes).String())
 		} else {
-			builder.WriteString("CPEs: " + cpes + "\n")
+			builder.WriteString("\tCPEs: " + cpes)
 		}
 	}
 
 	if (!noVulns && len(jsonData.Vulns) > 0) {
 		vulns := strings.Join(jsonData.Vulns, ", ")
 		if !noColor {
-			builder.WriteString("Vulnerabilities: " + aurora.Red(vulns).String() + "\n")
+			builder.WriteString("\tVulnerabilities: " + aurora.Red(vulns).String())
 		} else {
-			builder.WriteString("Vulnerabilities: " + vulns + "\n")
+			builder.WriteString("\tVulnerabilities: " + vulns)
 		}
 	}
 
 	if (!noHostnames && len(jsonData.Hostnames) > 0) {
 		hostnames := strings.Join(jsonData.Hostnames, ", ")
 		if !noColor {
-			builder.WriteString("Hostnames: " + aurora.Blue(hostnames).String() + "\n")
+			builder.WriteString("\t Hostnames: " + aurora.Blue(hostnames).String())
 		} else {
-			builder.WriteString("Hostnames: " + hostnames + "\n")
+			builder.WriteString("\tHostnames: " + hostnames)
 		}
 	}
 
 	if (!noTags && len(jsonData.Tags) > 0) {
 		tags := strings.Join(jsonData.Tags, ", ")
 		if !noColor {
-			builder.WriteString("Tags: " + aurora.Magenta(tags).String() + "\n")
+			builder.WriteString("\tTags: " + aurora.Magenta(tags).String())
 		} else {
-			builder.WriteString("Tags: " + tags + "\n")
+			builder.WriteString("\tTags: " + tags)
 		}
 	}
 
