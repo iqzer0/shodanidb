@@ -72,10 +72,7 @@ func main() {
 	total := len(targets)
 	writer := goterminal.New(os.Stdout)
 	for i := 0; i < len(targets); i++ {
-		fmt.Fprintf(writer, "Scanning (%d/%d) hosts...\n", i,total)
-		writer.Print()
-		time.Sleep(time.Millisecond * 5)
-		writer.Clear()
+
 		wg.Add(1)
 		i := i
 		go func() {
@@ -83,7 +80,6 @@ func main() {
 			jsonData := getData(targets[i], verbose)
 			channel <- jsonData
 		}()
-	
 	}
 	
 	go func() {
@@ -136,6 +132,8 @@ func getData(ip string, verbose bool) Response {
 	client := &http.Client{}
 	req, err := http.NewRequest("GET", url, nil)
 	req.Header.Add("User-Agent", `Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/39.0.2171.27 Safari/537.36`)
+	req.Header.Add("Connection", "close")
+	req.Close = true
 	res, err := client.Do(req)
 	if err != nil {
 		if verbose {
