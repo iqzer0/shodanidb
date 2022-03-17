@@ -1,4 +1,4 @@
-module github.com/iqzer0/shodanidb
+module shodanidb
 
 go 1.17
 
@@ -11,6 +11,6 @@ require (
 
 require (
 	github.com/mattn/go-isatty v0.0.14 // indirect
-	github.com/projectdiscovery/blackrock v0.0.0-20210903102120-5a9d2412d21d // indirect
-	golang.org/x/sys v0.0.0-20220317061510-51cd9980dadf // indirect
+	github.com/projectdiscovery/blackrock v0.0.0-20210415162320-b38689ae3a2e // indirect
+	golang.org/x/sys v0.0.0-20210630005230-0f9fa26af87c // indirect
 )
